@@ -63,6 +63,11 @@
     "voice": "default",
     "rate": 1.0,
     "volume": 0.5,
-    "mode": "sound-then-speak"
+    "mode": "sound-then-speak",
+    "pockettts": {
+      "daemon": false,
+      "port": 8123,
+      "auto_start": true
+    }
   }
 }

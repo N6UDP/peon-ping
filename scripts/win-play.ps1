@@ -71,6 +71,18 @@ function Invoke-NativeMediaPlayback {
     return $false
 }
 
+# WAV: System.Media.SoundPlayer (Win32 PlaySound) is dependency-free and works on
+# Windows 11 24H2+ where WPF MediaPlayer throws MILAVERR_INVALIDWMPVERSION.
+if ($path -match '\.wav$') {
+    try {
+        $sp = New-Object System.Media.SoundPlayer $path
+        $sp.PlaySync()
+        exit 0
+    } catch {
+        if ($peonDebug) { Write-Warning "peon-ping: SoundPlayer failed for '$path': $_" }
+    }
+}
+
 # Prefer native Windows playback for formats with reliable built-in codec support.
 # Exotic formats still fall through to the CLI player chain.
 if ($path -match '\.(wav|mp3|wma)$') {

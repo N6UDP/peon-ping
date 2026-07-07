@@ -313,6 +313,11 @@ if (-not $Updating) {
             rate = 1.0
             volume = 0.5
             mode = "sound-then-speak"
+            pockettts = @{
+                daemon = $false
+                port = 8123
+                auto_start = $true
+            }
         }
     }
     Set-PeonConfig $config $configPath
@@ -415,6 +420,34 @@ if (Test-Path $ttsNativeSource) {
         Invoke-WebRequest -Uri "$RepoBase/scripts/tts-native.ps1" -OutFile $ttsNativeTarget -UseBasicParsing -ErrorAction Stop
     } catch {
         Write-Host "  Warning: Could not download tts-native.ps1" -ForegroundColor Yellow
+    }
+}
+
+# --- Install tts-pockettts.ps1 (pocket-tts TTS backend, CLI default + optional daemon) ---
+$ttsPtSource = Join-Path $ScriptDir "scripts\tts-pockettts.ps1"
+$ttsPtTarget = Join-Path $scriptsDir "tts-pockettts.ps1"
+
+if (Test-Path $ttsPtSource) {
+    Copy-Item -Path $ttsPtSource -Destination $ttsPtTarget -Force
+} else {
+    try {
+        Invoke-WebRequest -Uri "$RepoBase/scripts/tts-pockettts.ps1" -OutFile $ttsPtTarget -UseBasicParsing -ErrorAction Stop
+    } catch {
+        Write-Host "  Warning: Could not download tts-pockettts.ps1" -ForegroundColor Yellow
+    }
+}
+
+# --- Install pockettts-serve.ps1 (multi-session-safe pocket-tts daemon helper) ---
+$ptServeSource = Join-Path $ScriptDir "scripts\pockettts-serve.ps1"
+$ptServeTarget = Join-Path $scriptsDir "pockettts-serve.ps1"
+
+if (Test-Path $ptServeSource) {
+    Copy-Item -Path $ptServeSource -Destination $ptServeTarget -Force
+} else {
+    try {
+        Invoke-WebRequest -Uri "$RepoBase/scripts/pockettts-serve.ps1" -OutFile $ptServeTarget -UseBasicParsing -ErrorAction Stop
+    } catch {
+        Write-Host "  Warning: Could not download pockettts-serve.ps1" -ForegroundColor Yellow
     }
 }
 
@@ -843,6 +876,7 @@ function Resolve-NotificationTemplate {
         [string]$Summary,
         [string]$ToolName,
         [string]$Status,
+        [string]$Title,
         [string]$DefaultMsg
     )
 
@@ -866,6 +900,7 @@ function Resolve-NotificationTemplate {
         tool_name = $ToolName
         status    = $Status
         event     = $Event
+        title     = $Title
     }
 
     # Replace known variables via .Replace() (PS 5.1 compatible)
@@ -899,6 +934,32 @@ function Resolve-TemplateSummary {
     return ''
 }
 
+# --- Session title resolution (Copilot CLI) ---
+# Copilot CLI stores a descriptive per-session title in session-store.db
+# (sessions.summary, keyed by session id). Look it up read-only so hook
+# templates can speak/show it via {title}. Cached per invocation; best-effort.
+$script:__sessionTitleCache = $null
+function Get-SessionTitle {
+    param([string]$SessionId)
+    if ($null -ne $script:__sessionTitleCache) { return $script:__sessionTitleCache }
+    $script:__sessionTitleCache = ''
+    if (-not $SessionId -or $SessionId -eq 'default') { return '' }
+    $db = Join-Path $env:USERPROFILE '.copilot\session-store.db'
+    if (-not (Test-Path $db)) { return '' }
+    $py = Get-Command python -ErrorAction SilentlyContinue
+    if (-not $py) { return '' }
+    try {
+        $q = "import sqlite3,sys" +
+             ";con=sqlite3.connect('file:'+sys.argv[1]+'?mode=ro',uri=True,timeout=2)" +
+             ";c=con.cursor();c.execute('SELECT summary FROM sessions WHERE id=?',(sys.argv[2],))" +
+             ";r=c.fetchone();print((r[0] or '') if r else '')"
+        $out = & $py.Source '-c' $q $db $SessionId 2>$null
+        $title = if ($out) { ([string]$out).Trim() } else { '' }
+        $script:__sessionTitleCache = $title
+        return $title
+    } catch { return '' }
+}
+
 # --- TTS backend resolution ---
 function Resolve-TtsBackend {
     param([string]$Backend = "auto")
@@ -906,9 +967,10 @@ function Resolve-TtsBackend {
         "native"     { return "tts-native.ps1" }
         "elevenlabs" { return "tts-elevenlabs.ps1" }
         "piper"      { return "tts-piper.ps1" }
+        "pockettts"  { return "tts-pockettts.ps1" }
         "auto" {
             # Probe in priority order: prefer premium when installed.
-            foreach ($b in @("elevenlabs", "piper", "native")) {
+            foreach ($b in @("elevenlabs", "piper", "pockettts", "native")) {
                 $scriptName = Resolve-TtsBackend -Backend $b
                 $full = Join-Path $InstallDir "scripts\$scriptName"
                 if (Test-Path $full) { return $scriptName }
@@ -2834,6 +2896,10 @@ if ($category) {
     if ($tplCfg0) {
         $tplSum0 = Resolve-TemplateSummary $event
         $tplTool0 = if ($event.tool_name) { [string]$event.tool_name } else { '' }
+        $tplTitle0 = if (($tplCfg0.PSObject.Properties.Value -join ' ') -match '\{title\}') {
+            $t0 = Get-SessionTitle $sessionId
+            if ($t0) { $t0 } else { $project }
+        } else { '' }
         $resolvedTemplate = Resolve-NotificationTemplate `
             -Templates $tplCfg0 `
             -Category $category `
@@ -2843,6 +2909,7 @@ if ($category) {
             -Summary $tplSum0 `
             -ToolName $tplTool0 `
             -Status $notifyStatus `
+            -Title $tplTitle0 `
             -DefaultMsg ""
     }
 }
@@ -3068,12 +3135,17 @@ if ($ttsEnabled -and $category) {
     # a shared $tplVars hashtable built once and reused by both paths.
     $tplSummary = Resolve-TemplateSummary $event
     $tplToolName = if ($event.tool_name) { [string]$event.tool_name } else { '' }
+    $tplTitle = if ($speechTpl -match '\{title\}') {
+        $t = Get-SessionTitle $sessionId
+        if ($t) { $t } else { $project }
+    } else { '' }
     $ttsVars = @{
         project   = $project
         summary   = $tplSummary
         tool_name = $tplToolName
         status    = $notifyStatus
         event     = $hookEvent
+        title     = $tplTitle
     }
 
     $ttsText = $speechTpl
@@ -3278,6 +3350,10 @@ if ($notify) {
     if ($tplCfg) {
         $tplSummary = Resolve-TemplateSummary $event
         $tplToolName = if ($event.tool_name) { [string]$event.tool_name } else { '' }
+        $tplTitleN = if (($tplCfg.PSObject.Properties.Value -join ' ') -match '\{title\}') {
+            $tn = Get-SessionTitle $sessionId
+            if ($tn) { $tn } else { $project }
+        } else { '' }
         $resolved = Resolve-NotificationTemplate `
             -Templates $tplCfg `
             -Category $category `
@@ -3287,6 +3363,7 @@ if ($notify) {
             -Summary $tplSummary `
             -ToolName $tplToolName `
             -Status $notifyStatus `
+            -Title $tplTitleN `
             -DefaultMsg $notifyMsg
         $notifyMsg = $resolved
     }
@@ -3333,6 +3410,10 @@ if ($ttsEnabled -and $category) {
         tool_name = if ($event.tool_name) { [string]$event.tool_name } else { '' }
         status    = $notifyStatus
         event     = $hookEvent
+        title     = if ($speechTpl -match '\{title\}') {
+            $t2 = Get-SessionTitle $sessionId
+            if ($t2) { $t2 } else { $project }
+        } else { '' }
     }
     $ttsText = $speechTpl
     foreach ($key in $ttsVars.Keys) {
