@@ -679,6 +679,10 @@ else
   curl -fsSL "$REPO_BASE/scripts/cmux-status-presentation.sh" -o "$INSTALL_DIR/scripts/cmux-status-presentation.sh" 2>/dev/null || true
   curl -fsSL "$REPO_BASE/scripts/cmux-workspace-field.sh" -o "$INSTALL_DIR/scripts/cmux-workspace-field.sh" 2>/dev/null || true
   curl -fsSL "$REPO_BASE/scripts/tts-native.sh" -o "$INSTALL_DIR/scripts/tts-native.sh" 2>/dev/null || true
+  curl -fsSL "$REPO_BASE/scripts/tts-pockettts.sh" -o "$INSTALL_DIR/scripts/tts-pockettts.sh" 2>/dev/null || true
+  curl -fsSL "$REPO_BASE/scripts/pockettts-serve.sh" -o "$INSTALL_DIR/scripts/pockettts-serve.sh" 2>/dev/null || true
+  curl -fsSL "$REPO_BASE/scripts/tts-pockettts.ps1" -o "$INSTALL_DIR/scripts/tts-pockettts.ps1" 2>/dev/null || true
+  curl -fsSL "$REPO_BASE/scripts/pockettts-serve.ps1" -o "$INSTALL_DIR/scripts/pockettts-serve.ps1" 2>/dev/null || true
   mkdir -p "$INSTALL_DIR/docs"
   curl -fsSL "$REPO_BASE/docs/peon-icon.png" -o "$INSTALL_DIR/docs/peon-icon.png" 2>/dev/null || true
   if [ "$UPDATING" = false ]; then
@@ -795,6 +799,8 @@ chmod +x "$INSTALL_DIR/scripts/cmux-focus.sh" 2>/dev/null || true
 chmod +x "$INSTALL_DIR/scripts/cmux-status-presentation.sh" 2>/dev/null || true
 chmod +x "$INSTALL_DIR/scripts/cmux-workspace-field.sh" 2>/dev/null || true
 chmod +x "$INSTALL_DIR/scripts/tts-native.sh" 2>/dev/null || true
+chmod +x "$INSTALL_DIR/scripts/tts-pockettts.sh" 2>/dev/null || true
+chmod +x "$INSTALL_DIR/scripts/pockettts-serve.sh" 2>/dev/null || true
 
 # --- Build peon-play (macOS Sound Effects device support) ---
 if [ "$PLATFORM" = "mac" ] && command -v swiftc &>/dev/null; then

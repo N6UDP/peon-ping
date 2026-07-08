@@ -980,6 +980,8 @@ function Test-TtsBackendReady {
         }
         "pockettts" {
             # Runs pocket-tts via its `uvx` launcher; prefer only if uvx is on PATH.
+            # (Not reached by `auto` — pockettts is explicit-only — but kept so an
+            # explicit selection can still be capability-checked by callers.)
             return [bool](Get-Command uvx -ErrorAction SilentlyContinue)
         }
         "native" { return $true }
@@ -997,9 +999,11 @@ function Resolve-TtsBackend {
         "auto" {
             # Probe in priority order: prefer premium when installed AND ready.
             # A backend matches only when its script is present and its
-            # dependency check passes (see Test-TtsBackendReady). This keeps
-            # native (always ready) as the safe fallback.
-            foreach ($b in @("elevenlabs", "piper", "pockettts", "native")) {
+            # dependency check passes (see Test-TtsBackendReady). native (always
+            # ready) is the safe fallback.
+            # NOTE: pockettts is intentionally NOT auto-probed — it is opt-in and
+            # only used when explicitly selected via `backend: "pockettts"`.
+            foreach ($b in @("elevenlabs", "piper", "native")) {
                 $scriptName = Resolve-TtsBackend -Backend $b
                 $full = Join-Path $InstallDir "scripts\$scriptName"
                 if (-not (Test-Path $full)) { continue }

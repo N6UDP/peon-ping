@@ -81,8 +81,10 @@ scripts/
   tts-elevenlabs.ps1  # (future) ElevenLabs API
   tts-piper.sh        # (future) Piper standalone
   tts-piper.ps1       # (future) Piper standalone
-  tts-pockettts.ps1   # (N6UDP fork) pocket-tts CLI + optional serve daemon
-  pockettts-serve.ps1 # (N6UDP fork) multi-session-safe pocket-tts daemon manager
+  tts-pockettts.sh    # (N6UDP fork) pocket-tts CLI + optional serve daemon (mac/Linux/WSL)
+  tts-pockettts.ps1   # (N6UDP fork) pocket-tts CLI + optional serve daemon (Windows)
+  pockettts-serve.sh  # (N6UDP fork) multi-session-safe pocket-tts daemon manager (mac/Linux/WSL)
+  pockettts-serve.ps1 # (N6UDP fork) multi-session-safe pocket-tts daemon manager (Windows)
   win-play.ps1        # (existing) Windows audio playback
 ```
 

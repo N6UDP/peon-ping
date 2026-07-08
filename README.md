@@ -585,16 +585,15 @@ In addition to sound-pack voice lines, peon-ping can **speak** notifications wit
 - **`backend`** selects the engine. `"auto"` (default) probes for a backend in priority order and uses the first one that is both installed **and ready** (its dependency is present/configured):
   1. `elevenlabs` — ElevenLabs API *(ready when an API key is set via `ELEVENLABS_API_KEY` or `tts.elevenlabs.api_key`)*
   2. `piper` — Piper local neural *(ready when the `piper` binary is on `PATH`)*
-  3. `pockettts` — pocket-tts *(ready when its `uvx` launcher is on `PATH`)*
-  4. `native` — Windows SAPI5 / macOS `say` / Linux `espeak-ng` (always ready, so it is the safe fallback)
+  3. `native` — Windows SAPI5 / macOS `say` / Linux `espeak-ng` (always ready, so it is the safe fallback)
 
-  Because `auto` prefers any ready optional backend over `native`, set `backend` explicitly (e.g. `"native"` or `"pockettts"`) if you want to pin one.
+  `pockettts` is **not** part of `auto` probing — it is opt-in and used only when you set `backend: "pockettts"` explicitly. Set `backend` explicitly (e.g. `"native"` or `"pockettts"`) whenever you want to pin one.
 - **`mode`** — `sound-then-speak` (play the pack line, then speak), `speak-only`, or `sound-only`.
 - **`{title}` template variable** — TTS and notification templates support `{title}`, which resolves to the current agent session's title (for Copilot CLI, read read-only from `~/.copilot/session-store.db`) and falls back to the project name. For example a `stop` template of `"{title}. Work complete."` speaks the real session title instead of just the working-directory name.
 
-#### pocket-tts backend (Windows)
+#### pocket-tts backend (macOS / Linux / WSL / Windows)
 
-The `pockettts` backend synthesizes speech with [pocket-tts](https://github.com/PeonPing/pocket-tts) via `uvx pocket-tts`, letting you speak in a cloned game-character voice. It requires [`uv`](https://docs.astral.sh/uv/) (which provides `uvx`); with `backend: "auto"` it is only selected when `uvx` is on `PATH`, otherwise peon-ping falls back to the always-available `native` engine.
+The `pockettts` backend synthesizes speech with [pocket-tts](https://github.com/PeonPing/pocket-tts) via `uvx pocket-tts`, letting you speak in a cloned game-character voice. It requires [`uv`](https://docs.astral.sh/uv/) (which provides `uvx`). It is **opt-in**: select it with `backend: "pockettts"` (it is never chosen by `auto`).
 
 By default it uses the pocket-tts **CLI** (`uvx pocket-tts generate`), so no long-running process is needed (~7s cold per line). For lower latency you can opt into a shared background `serve` daemon:
 
@@ -602,7 +601,7 @@ By default it uses the pocket-tts **CLI** (`uvx pocket-tts generate`), so no lon
 "tts": {
   "enabled": true,
   "backend": "pockettts",
-  "voice": "C:/path/to/your-voice.safetensors",
+  "voice": "/path/to/your-voice.safetensors",
   "pockettts": {
     "daemon": false,
     "port": 8123,
@@ -613,9 +612,9 @@ By default it uses the pocket-tts **CLI** (`uvx pocket-tts generate`), so no lon
 
 - **`daemon`** — `false` (default) uses the CLI only. `true` uses a persistent `serve` HTTP daemon for warm (~3s) synthesis.
 - **`port`** — port for the `serve` daemon (env `PEON_PTTS_PORT` overrides). Default `8123`.
-- **`daemon_auto_start`** — only applies when `daemon: true`. It controls whether peon-ping may **start the daemon for you**. When `true` (default), if the daemon is not already running, peon-ping launches it detached in the background and speaks the current line via the CLI while it warms up; subsequent lines use the warm daemon. When `false`, peon-ping never spawns the daemon itself — it uses the daemon only if you started it yourself (`scripts/pockettts-serve.ps1 start`), and otherwise falls back to the CLI.
+- **`daemon_auto_start`** — only applies when `daemon: true`. It controls whether peon-ping may **start the daemon for you**. When `true` (default), if the daemon is not already running, peon-ping launches it detached in the background and speaks the current line via the CLI while it warms up; subsequent lines use the warm daemon. When `false`, peon-ping never spawns the daemon itself — it uses the daemon only if you started it yourself (`pockettts-serve start`), and otherwise falls back to the CLI.
 
-The daemon is **multi-session-safe**: `scripts/pockettts-serve.ps1` uses a lockfile to serialize startup, so multiple concurrent agent sessions share one daemon instead of spawning duplicates. Manage it directly with `pockettts-serve.ps1 start|stop|status|restart`.
+The daemon is **multi-session-safe**: the `pockettts-serve` helper (`pockettts-serve.sh` on macOS/Linux/WSL, `pockettts-serve.ps1` on Windows) uses an atomic lock to serialize startup, so multiple concurrent agent sessions share one daemon instead of spawning duplicates. Manage it directly with `pockettts-serve start|stop|status|restart`.
 
 **Voice:** set `tts.voice` to a pocket-tts `.safetensors` (or reference `.wav`) file to speak in that cloned voice; otherwise a bundled `voices/peon-*` asset is used if present, falling back to the pocket-tts built-in voice. Voice clone assets are not bundled — supply your own.
 

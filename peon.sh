@@ -463,9 +463,12 @@ _resolve_tts_backend() {
     native)     echo "tts-native.sh" ;;
     elevenlabs) echo "tts-elevenlabs.sh" ;;
     piper)      echo "tts-piper.sh" ;;
+    pockettts)  echo "tts-pockettts.sh" ;;
     auto)
       # Probe in priority order: prefer premium when installed.
       # Each candidate is resolved inline (no recursive self-call).
+      # NOTE: pockettts is intentionally NOT auto-probed — it is opt-in and only
+      # used when explicitly selected via `backend: "pockettts"`.
       local candidate
       for candidate in tts-elevenlabs.sh tts-piper.sh tts-native.sh; do  # keep in sync with named cases above
         find_bundled_script "$candidate" >/dev/null 2>&1 || continue
@@ -6064,6 +6067,29 @@ if event == 'Notification':
 elif event == 'PermissionRequest':
     _tpl_key = 'permission'
 _tpl = _templates.get(_tpl_key, '')
+
+def _session_title(sid):
+    # Resolve the current agent session's title from the Copilot CLI session
+    # store (read-only). Falls back to '' so callers can default to project.
+    if not sid or sid == 'default':
+        return ''
+    _db = os.path.join(os.path.expanduser('~'), '.copilot', 'session-store.db')
+    if not os.path.exists(_db):
+        return ''
+    try:
+        import sqlite3
+        _con = sqlite3.connect('file:' + _db + '?mode=ro', uri=True, timeout=2)
+        try:
+            _row = _con.execute('SELECT summary FROM sessions WHERE id=?', (sid,)).fetchone()
+        finally:
+            _con.close()
+        return (_row[0] or '').strip() if _row else ''
+    except Exception:
+        return ''
+
+_title = ''
+if _tpl and '{title}' in _tpl:
+    _title = _session_title(session_id) or project
 _tpl_vars = _defaultdict(str, {
     'project': project,
     'summary': _template_summary(event_data),
@@ -6073,6 +6099,7 @@ _tpl_vars = _defaultdict(str, {
     'event': event,
     'ide': ide_label,
     'ide_id': session_ide,
+    'title': _title,
 })
 if _tpl:
     try:
@@ -6100,6 +6127,11 @@ if tts_enabled and category:
         _speech_tpl = _tpl  # already resolved notification template
     else:
         _speech_tpl = '{project} \u2014 {status}'
+
+    # Resolve {title} lazily for speech templates that use it (the notification
+    # template path already populated it above when present).
+    if '{title}' in _speech_tpl and not _tpl_vars['title']:
+        _tpl_vars['title'] = _session_title(session_id) or project
 
     try:
         tts_text = _speech_tpl.format_map(_tpl_vars)
