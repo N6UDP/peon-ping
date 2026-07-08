@@ -618,6 +618,31 @@ The daemon is **multi-session-safe**: the `pockettts-serve` helper (`pockettts-s
 
 **Voice:** set `tts.voice` to a pocket-tts `.safetensors` (or reference `.wav`) file to speak in that cloned voice; otherwise a bundled `voices/peon-*` asset is used if present, falling back to the pocket-tts built-in voice. Voice clone assets are not bundled — supply your own.
 
+##### Cloning a voice
+
+pocket-tts clones a voice from a short reference clip — no training required.
+
+1. **Get a reference clip.** A few seconds (~5–10s) of clean speech from the target voice, as a mono WAV works best. Trim out music and silence.
+2. **Use it directly, or export it once.** You can point `--voice` straight at the reference WAV, but exporting it to a `.safetensors` embedding is faster (no re-encoding on every line) and reusable:
+
+   ```bash
+   uvx pocket-tts export-voice reference.wav my-voice.safetensors
+   # non-English? add e.g. --language french_24l
+   ```
+3. **Point peon-ping at it** in `config.json`:
+
+   ```json
+   "tts": { "enabled": true, "backend": "pockettts", "voice": "/path/to/my-voice.safetensors" }
+   ```
+
+   (peon-ping passes this file to pocket-tts's `--voice`, so either a `.safetensors` or a reference `.wav` works.) You can preview a clone without peon-ping:
+
+   ```bash
+   uvx pocket-tts generate --voice my-voice.safetensors --text "Ready to work." --output-path preview.wav
+   ```
+
+> ⚠️ Only clone voices you have the rights to use. Audio ripped from games, films, or other copyrighted media is owned by its rights holders — keep such clones local and personal; don't commit or redistribute them. peon-ping does not bundle any cloned voice.
+
 ## Common Use Cases
 
 ### Sounds without popups
