@@ -316,7 +316,7 @@ if (-not $Updating) {
             pockettts = @{
                 daemon = $false
                 port = 8123
-                auto_start = $true
+                daemon_auto_start = $true
             }
         }
     }
@@ -961,6 +961,32 @@ function Get-SessionTitle {
 }
 
 # --- TTS backend resolution ---
+function Test-TtsBackendReady {
+    # Readiness gate for `auto` selection. Mirrors the upstream framework: an
+    # optional backend is only auto-selected when its dependency is actually
+    # present/configured, otherwise `auto` falls through to native. native is
+    # always ready (macOS say / Windows SAPI5 / Linux espeak-ng).
+    param([string]$Backend)
+    switch ($Backend) {
+        "elevenlabs" {
+            # Cloud API: needs an API key (env or config), like the ADR describes.
+            if ($env:ELEVENLABS_API_KEY) { return $true }
+            if ($config.tts.elevenlabs.api_key) { return $true }
+            return $false
+        }
+        "piper" {
+            # BYO local binary: prefer only if the `piper` executable is on PATH.
+            return [bool](Get-Command piper -ErrorAction SilentlyContinue)
+        }
+        "pockettts" {
+            # Runs pocket-tts via its `uvx` launcher; prefer only if uvx is on PATH.
+            return [bool](Get-Command uvx -ErrorAction SilentlyContinue)
+        }
+        "native" { return $true }
+        default { return $false }
+    }
+}
+
 function Resolve-TtsBackend {
     param([string]$Backend = "auto")
     switch ($Backend) {
@@ -969,17 +995,15 @@ function Resolve-TtsBackend {
         "piper"      { return "tts-piper.ps1" }
         "pockettts"  { return "tts-pockettts.ps1" }
         "auto" {
-            # Probe in priority order: prefer premium when installed.
-            # A backend "matches" when its script is present AND, for backends
-            # that depend on an external runtime, that runtime is actually
-            # available. pockettts ships unconditionally, so gate it on `uvx`
-            # (its pocket-tts launcher) being on PATH; otherwise fall through to
-            # native (Windows SAPI5), which always works.
+            # Probe in priority order: prefer premium when installed AND ready.
+            # A backend matches only when its script is present and its
+            # dependency check passes (see Test-TtsBackendReady). This keeps
+            # native (always ready) as the safe fallback.
             foreach ($b in @("elevenlabs", "piper", "pockettts", "native")) {
                 $scriptName = Resolve-TtsBackend -Backend $b
                 $full = Join-Path $InstallDir "scripts\$scriptName"
                 if (-not (Test-Path $full)) { continue }
-                if ($b -eq "pockettts" -and -not (Get-Command uvx -ErrorAction SilentlyContinue)) { continue }
+                if (-not (Test-TtsBackendReady $b)) { continue }
                 return $scriptName
             }
             return $null

@@ -582,13 +582,13 @@ In addition to sound-pack voice lines, peon-ping can **speak** notifications wit
 }
 ```
 
-- **`backend`** selects the engine. `"auto"` (default) probes for an available backend in priority order and uses the first one that is both installed **and** usable:
-  1. `elevenlabs` — ElevenLabs API *(if present)*
-  2. `piper` — Piper local neural *(if present)*
-  3. `pockettts` — pocket-tts *(only chosen when the `uvx` launcher is on `PATH`)*
-  4. `native` — Windows SAPI5 / macOS `say` / Linux `espeak-ng` (always available, so it is the safe fallback)
+- **`backend`** selects the engine. `"auto"` (default) probes for a backend in priority order and uses the first one that is both installed **and ready** (its dependency is present/configured):
+  1. `elevenlabs` — ElevenLabs API *(ready when an API key is set via `ELEVENLABS_API_KEY` or `tts.elevenlabs.api_key`)*
+  2. `piper` — Piper local neural *(ready when the `piper` binary is on `PATH`)*
+  3. `pockettts` — pocket-tts *(ready when its `uvx` launcher is on `PATH`)*
+  4. `native` — Windows SAPI5 / macOS `say` / Linux `espeak-ng` (always ready, so it is the safe fallback)
 
-  Set `backend` explicitly (e.g. `"pockettts"` or `"native"`) to skip probing.
+  Because `auto` prefers any ready optional backend over `native`, set `backend` explicitly (e.g. `"native"` or `"pockettts"`) if you want to pin one.
 - **`mode`** — `sound-then-speak` (play the pack line, then speak), `speak-only`, or `sound-only`.
 - **`{title}` template variable** — TTS and notification templates support `{title}`, which resolves to the current agent session's title (for Copilot CLI, read read-only from `~/.copilot/session-store.db`) and falls back to the project name. For example a `stop` template of `"{title}. Work complete."` speaks the real session title instead of just the working-directory name.
 
@@ -606,14 +606,14 @@ By default it uses the pocket-tts **CLI** (`uvx pocket-tts generate`), so no lon
   "pockettts": {
     "daemon": false,
     "port": 8123,
-    "auto_start": true
+    "daemon_auto_start": true
   }
 }
 ```
 
 - **`daemon`** — `false` (default) uses the CLI only. `true` uses a persistent `serve` HTTP daemon for warm (~3s) synthesis.
 - **`port`** — port for the `serve` daemon (env `PEON_PTTS_PORT` overrides). Default `8123`.
-- **`auto_start`** — only applies when `daemon: true`. It controls whether peon-ping may **start the daemon for you**. When `true` (default), if the daemon is not already running, peon-ping launches it detached in the background and speaks the current line via the CLI while it warms up; subsequent lines use the warm daemon. When `false`, peon-ping never spawns the daemon itself — it uses the daemon only if you started it yourself (`scripts/pockettts-serve.ps1 start`), and otherwise falls back to the CLI.
+- **`daemon_auto_start`** — only applies when `daemon: true`. It controls whether peon-ping may **start the daemon for you**. When `true` (default), if the daemon is not already running, peon-ping launches it detached in the background and speaks the current line via the CLI while it warms up; subsequent lines use the warm daemon. When `false`, peon-ping never spawns the daemon itself — it uses the daemon only if you started it yourself (`scripts/pockettts-serve.ps1 start`), and otherwise falls back to the CLI.
 
 The daemon is **multi-session-safe**: `scripts/pockettts-serve.ps1` uses a lockfile to serialize startup, so multiple concurrent agent sessions share one daemon instead of spawning duplicates. Manage it directly with `pockettts-serve.ps1 start|stop|status|restart`.
 

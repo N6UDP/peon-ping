@@ -67,7 +67,7 @@
     "pockettts": {
       "daemon": false,
       "port": 8123,
-      "auto_start": true
+      "daemon_auto_start": true
     }
   }
 }

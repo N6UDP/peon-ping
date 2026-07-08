@@ -13,14 +13,14 @@
         CLI. Simple and dependency-light; ~7s cold per line.
       - daemon = true: use a shared `serve` daemon for warm (~3s) synthesis. If
         the daemon is healthy its /tts endpoint is used. If it is down and
-        auto_start is true, a detached, multi-session-safe start is kicked off
-        (non-blocking) and the CURRENT line is spoken via the CLI so nothing is
-        lost while the daemon warms up. Subsequent lines use the warm daemon.
+        daemon_auto_start is true, a detached, multi-session-safe start is kicked
+        off (non-blocking) and the CURRENT line is spoken via the CLI so nothing
+        is lost while the daemon warms up. Subsequent lines use the warm daemon.
 
     Config keys (all optional):
-      tts.pockettts.daemon      bool   default false
-      tts.pockettts.port        int    default 8123 (env PEON_PTTS_PORT wins)
-      tts.pockettts.auto_start  bool   default true (only when daemon = true)
+      tts.pockettts.daemon             bool   default false
+      tts.pockettts.port               int    default 8123 (env PEON_PTTS_PORT wins)
+      tts.pockettts.daemon_auto_start  bool   default true (only when daemon = true)
 
     Voice resolution (first match wins):
       1. -Voice param if it points at an existing .wav/.safetensors file
@@ -99,7 +99,7 @@ end {
             $pt = $cfg.tts.pockettts
             if ($pt) {
                 if ($null -ne $pt.daemon) { $daemon = [bool]$pt.daemon }
-                if ($null -ne $pt.auto_start) { $autoStart = [bool]$pt.auto_start }
+                if ($null -ne $pt.daemon_auto_start) { $autoStart = [bool]$pt.daemon_auto_start }
                 if ((-not $env:PEON_PTTS_PORT) -and $pt.port) { $port = [string]$pt.port }
             }
         } catch { Dbg "config read failed: $_" }
