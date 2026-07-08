@@ -1,9 +1,3 @@
-## Unreleased (N6UDP fork)
-
-### Added
-- **pocket-tts TTS backend (`tts-pockettts.ps1`, Windows).** A new backend that synthesizes speech with [pocket-tts](https://github.com/PeonPing/pocket-tts) via `uvx pocket-tts`, enabling a cloned game-character voice for spoken notifications. It **defaults to the pocket-tts CLI** (`uvx pocket-tts generate`) so no long-running process is required. A config block `tts.pockettts` opts into a shared background `serve` daemon for lower latency: `{ "daemon": false, "port": 8123, "auto_start": true }`. When `daemon` is true the backend uses the HTTP daemon if healthy, and otherwise (with `auto_start`) kicks a detached, **multi-session-safe** daemon start via `scripts/pockettts-serve.ps1` (a lockfile serializes the start window so concurrent Copilot/Claude sessions never spawn duplicates) while synthesizing the current line through the CLI so nothing blocks. The backend also repairs the placeholder WAV data-chunk size that the `serve` endpoint streams, so `System.Media.SoundPlayer` plays the audio correctly on Windows 11 24H2+. Voice resolution: `-Voice` file → bundled `voices/peon-*.{safetensors,wav}` → pocket-tts built-in default. Selectable via `tts.backend = "pockettts"` or auto-probe.
-- **Spoken session titles via `{title}` template variable.** Notification templates and TTS speech templates now support `{title}`, which resolves to the current Copilot CLI session's title (read read-only from `~/.copilot/session-store.db`), falling back to the project name when unavailable. This lets spoken notifications say the real session title (e.g. "Integrate Ponytail and Peon Ping. Work complete.") instead of just the working-directory leaf.
-
 ## v2.34.0 (2026-07-07)
 
 ### Added

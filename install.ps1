@@ -970,10 +970,17 @@ function Resolve-TtsBackend {
         "pockettts"  { return "tts-pockettts.ps1" }
         "auto" {
             # Probe in priority order: prefer premium when installed.
+            # A backend "matches" when its script is present AND, for backends
+            # that depend on an external runtime, that runtime is actually
+            # available. pockettts ships unconditionally, so gate it on `uvx`
+            # (its pocket-tts launcher) being on PATH; otherwise fall through to
+            # native (Windows SAPI5), which always works.
             foreach ($b in @("elevenlabs", "piper", "pockettts", "native")) {
                 $scriptName = Resolve-TtsBackend -Backend $b
                 $full = Join-Path $InstallDir "scripts\$scriptName"
-                if (Test-Path $full) { return $scriptName }
+                if (-not (Test-Path $full)) { continue }
+                if ($b -eq "pockettts" -and -not (Get-Command uvx -ErrorAction SilentlyContinue)) { continue }
+                return $scriptName
             }
             return $null
         }
